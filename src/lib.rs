@@ -2,6 +2,7 @@ use std::{
     sync::{mpsc, Arc, Mutex},
     thread,
 };
+use thiserror::Error;
 
 pub struct Worker {
     id: usize,
@@ -45,7 +46,7 @@ impl ThreadPool {
     ///
     /// The `new` function will panic if the size is zero.
     pub fn new(size: usize) -> ThreadPool {
-        assert!(size > 0);
+        assert!(size > 0, "ThreadPool should have size bigger than 0");
 
         let (sender, receiver) = mpsc::channel();
 
@@ -84,4 +85,37 @@ impl Drop for ThreadPool {
             }
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ThreadPool;
+
+    #[test]
+    #[should_panic(expected = "ThreadPool should have size bigger than 0")]
+    fn thread_panic_for_zero() {
+        ThreadPool::new(0);
+    }
+
+    #[test]
+    fn thread_successful_one_thread() {
+        ThreadPool::new(1);
+    }
+
+    #[test]
+    fn thread_successful_multiple_thread() {
+        ThreadPool::new(4);
+    }
+
+    #[test]
+    fn thread_execute_correctly() {
+        let pool = ThreadPool::new(4);
+        pool.execute(|| {
+            for number in 0..4 {
+                println!("{number}!");
+            }
+        })
+    }
+
+
 }

@@ -7,14 +7,23 @@ use std::{
 };
 
 use rustserver::ThreadPool;
+use thiserror::Error;
+
+
 
 fn main() {
-    let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
+    let listener = TcpListener::bind("127.0.0.1:7878").expect(" Could not bind to the specified address and/or port");
 
     let pool = ThreadPool::new(4);
 
     for stream in listener.incoming() {
-        let stream = stream.unwrap();
+        let stream = match stream {
+            Ok(x) => x,
+            Err(e) => {
+                println!("{e} - The incoming stream has been invalid.");
+                continue
+            }
+        };
 
         pool.execute(|| {
             handle_connection(stream);
@@ -26,16 +35,27 @@ fn handle_connection(mut stream: TcpStream) {
     let buf_reader = BufReader::new(&mut stream);
     let request_line = buf_reader.lines().next().unwrap().unwrap();
 
+    //let request_line = buf_reader.lines().next().ok_or(ConnectionError)?.map_err(|e|{e.to_string()});
+
     let (status_line, filename) = match &request_line[..] {
         "GET / HTTP/1.1" => ("HTTP/1.1 200 OK", "hello.html"),
         "GET /sleep HTTP/1.1" => {
             thread::sleep(Duration::from_secs(5));
             ("HTTP/1.1 200 OK", "hello.html")
-        }
+        },
+        "GET /test HTTP/1.1" => ("HTTP/1.1 200 OK", "test.html"),
+
         _ => ("HTTP/1.1 404 NOT FOUND", "404.html"),
     };
 
-    let contents = fs::read_to_string(filename).unwrap();
+    let contents = match fs::read_to_string(filename) {
+        Ok(content) => content,
+        Err(e) => {
+            println!("{e} - The {filename} has not been defined.");
+            return;
+        }
+    };
+
     let length = contents.len();
 
     let response =
